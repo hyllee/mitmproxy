@@ -97,10 +97,16 @@ class Options(optmanager.OptManager):
             """
         )
         self.add_option(
+            "no_upstream_hosts", Sequence[str], [],
+            """
+            Prevent specific hosts from being passed to upstream when upstream
+            proxy mode is enabled.
+            """
+        )
+        self.add_option(
             "upstream_cert", bool, True,
             "Connect to upstream server to look up certificate details."
         )
-
         self.add_option(
             "http2", bool, True,
             "Enable/disable HTTP/2 support. "

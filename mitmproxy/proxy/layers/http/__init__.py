@@ -1,5 +1,6 @@
 import collections
 import enum
+import re
 import time
 from dataclasses import dataclass
 from typing import DefaultDict, Dict, List, Optional, Tuple, Union
@@ -100,10 +101,14 @@ class HttpStream(layer.Layer):
     child_layer: Optional[layer.Layer] = None
 
     @property
-    def mode(self):
+    def parent(self):
         i = self.context.layers.index(self)
         parent: HttpLayer = self.context.layers[i - 1]
-        return parent.mode
+        return parent
+
+    @property
+    def mode(self):
+        return self.parent.mode
 
     def __init__(self, context: Context, stream_id: int):
         super().__init__(context)
@@ -180,7 +185,7 @@ class HttpStream(layer.Layer):
                 self.flow.request.data.port = port
                 self.flow.request.scheme = "https" if self.context.client.tls else "http"
 
-        if self.mode is HTTPMode.regular and not self.flow.request.is_http2:
+        if (self.mode is HTTPMode.regular or self.parent.check_skip_upstream(self.flow.request.host)) and not self.flow.request.is_http2:
             # Set the request target to origin-form for HTTP/1, some servers don't support absolute-form requests.
             # see https://github.com/mitmproxy/mitmproxy/issues/1759
             self.flow.request.authority = ""
@@ -600,8 +605,18 @@ class HttpLayer(layer.Layer):
             context.client: http_conn
         }
 
+        self.no_upstream_hosts = [
+            re.compile(x, re.IGNORECASE) for x in self.context.options.no_upstream_hosts
+        ]
+
     def __repr__(self):
         return f"HttpLayer({self.mode.name}, conns: {len(self.connections)})"
+
+    def check_skip_upstream(self, host: str) -> bool:
+        return any(
+            rex.search(host)
+            for rex in self.no_upstream_hosts
+        )
 
     def _handle_event(self, event: events.Event):
         if isinstance(event, events.Start):
@@ -726,6 +741,9 @@ class HttpLayer(layer.Layer):
             context.server = Server(event.address)
             if event.tls:
                 context.server.sni = event.address[0]
+
+            if self.check_skip_upstream(event.address[0]):
+                event.via = None
 
             if event.via:
                 assert event.via.scheme in ("http", "https")
