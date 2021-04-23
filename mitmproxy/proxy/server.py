@@ -81,7 +81,7 @@ class ConnectionHandler(metaclass=abc.ABCMeta):
     def __init__(self, context: Context) -> None:
         self.client = context.client
         self.transports = {}
-        self.max_conns = collections.defaultdict(lambda: asyncio.Semaphore(5))
+        self.max_conns = collections.defaultdict(lambda: asyncio.Semaphore(50))
 
         # Ask for the first layer right away.
         # In a reverse proxy scenario, this is necessary as we would otherwise hang
