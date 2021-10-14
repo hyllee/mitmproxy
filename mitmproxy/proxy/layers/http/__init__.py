@@ -466,7 +466,7 @@ class HttpStream(layer.Layer):
 
         self.context.server.address = (self.flow.request.host, self.flow.request.port)
 
-        if self.mode == HTTPMode.regular:
+        if self.mode == HTTPMode.regular or self.parent.check_skip_upstream(self.flow.request.host):
             yield from self.handle_connect_regular()
         else:
             yield from self.handle_connect_upstream()
